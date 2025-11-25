@@ -1,0 +1,352 @@
+openapi: 3.0.3
+info:
+  title: Book Management & E-commerce API
+  version: 1.0.0
+  description: >
+    Robust backend API for managing a book catalog, user roles (Admin, Author, Customer),
+    and secure E-commerce order transactions. Focuses on data integrity, RBAC, and scalable querying.
+
+servers:
+  - url: https://bookstoremanagement-2.onrender.com
+    description: Production server (default)
+
+tags:
+  - name: Auth
+    description: User authentication, registration, and login (JWT via HTTP-only cookie)
+  - name: Books
+    description: Public and private CRUD operations for the book catalog
+  - name: Orders
+    description: Customer order placement, history retrieval, and inventory management
+  - name: Admin
+    description: System oversight and management of user roles and resources
+
+paths:
+  /author/signup:
+    post:
+      tags: [Auth]
+      summary: User registration (Signup)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseResponse'
+        '409':
+          description: Email already registered
+        '500':
+          description: Server error
+
+  /author/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful; JWT set in HTTP-only cookie
+          headers:
+            Set-Cookie:
+              description: JWT token set as HTTP-only cookie named "token"
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Server error
+
+  /book:
+    get:
+      tags: [Books]
+      summary: Get list of books with filtering, sorting, and pagination
+      parameters:
+        - in: query
+          name: genre
+          schema: { type: string }
+          description: Filter by book genre
+        - in: query
+          name: minPrice
+          schema: { type: number }
+          description: Minimum price filter
+        - in: query
+          name: sortBy
+          schema: { type: string, enum: [createdAt, price, rating], default: createdAt }
+          description: Sort field
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: desc }
+          description: Sort order
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+          description: Page number for pagination
+      responses:
+        '200':
+          description: List of books with pagination metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  total: { type: integer, example: 50 }
+                  data: { type: array, items: { $ref: '#/components/schemas/Book' } }
+
+  /book/create:
+    post:
+      tags: [Books]
+      summary: Create a new book
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookRequest'
+      responses:
+        '201':
+          description: Book created successfully
+          content: { application/json: { schema: { $ref: '#/components/schemas/BookResponse' } } }
+        '401':
+          description: Unauthorized (missing token)
+        '403':
+          description: Forbidden (user role is not Author or Admin)
+
+  /book/{id}:
+    patch:
+      tags: [Books]
+      summary: Update book details (by Owner or Admin)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Book ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookRequest' # Reuse schema for structure
+      responses:
+        '200':
+          description: Book updated
+        '403':
+          description: Forbidden (user is not owner and not admin)
+        '404':
+          description: Book not found
+    delete:
+      tags: [Books]
+      summary: Delete book (by Owner or Admin)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Book ID
+      responses:
+        '200':
+          description: Book deleted successfully
+        '403':
+          description: Forbidden (user is not owner and not admin)
+
+  /order/place:
+    post:
+      tags: [Orders]
+      summary: Place a new order (single book or cart checkout)
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+      responses:
+        '201':
+          description: Order placed and inventory updated
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } }
+        '403':
+          description: Forbidden (user is not a Customer)
+        '400':
+          description: Insufficient stock or validation error
+
+  /order/history:
+    get:
+      tags: [Orders]
+      summary: Get authenticated user's order history
+      security: [ { cookieAuth: [] } ]
+      responses:
+        '200':
+          description: List of user orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/Order' } }
+
+  /author/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Update a user's role (Admin privilege required)
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Target User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: Role updated successfully
+        '403':
+          description: Forbidden (user is not Admin)
+        '404':
+          description: User not found
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: JWT auth token stored in HTTP-only cookie named "token"
+
+  schemas:
+    BaseResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: Operation successful }
+
+    AuthResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            token: { type: string, description: JWT token string for reference }
+
+    BookResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Book' }
+
+    OrderResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            order: { $ref: '#/components/schemas/Order' }
+
+    SignupRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name: { type: string, example: Alex Author }
+        email: { type: string, format: email, example: author@example.com }
+        password: { type: string, format: password, example: secureP@ss123 }
+        role: { type: string, enum: [author, customer, admin], example: author }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: customer@example.com }
+        password: { type: string, format: password, example: secureP@ss123 }
+
+    CreateBookRequest:
+      type: object
+      required: [title, price, stock]
+      properties:
+        title: { type: string, example: The Secret History of API Design }
+        description: { type: string }
+        genre: { type: string, enum: [Fiction, Non-fiction, Sci-Fi, Fantasy, Romance, Thriller, Other], example: Sci-Fi }
+        price: { type: number, minimum: 0, example: 19.99 }
+        stock: { type: integer, minimum: 0, example: 50 }
+        pages: { type: integer }
+        publishedYear: { type: integer }
+        rating: { type: number, minimum: 0, maximum: 5, example: 4.5 }
+
+    UpdateRoleRequest:
+      type: object
+      required: [newRole]
+      properties:
+        newRole: { type: string, enum: [author, customer, admin], example: customer }
+
+    PlaceOrderRequest:
+      type: object
+      # Allows either a single book (bookId, quantity) or a cart (items array)
+      properties:
+        bookId: { type: string, description: Book ID for single purchase shortcut }
+        quantity: { type: integer, minimum: 1, description: Quantity for single purchase shortcut }
+        items:
+          type: array
+          description: Array of items for cart checkout
+          items:
+            type: object
+            required: [bookId, quantity]
+            properties:
+              bookId: { type: string }
+              quantity: { type: integer, minimum: 1 }
+
+    User:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [author, customer, admin] }
+
+    Book:
+      type: object
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        genre: { type: string }
+        price: { type: number }
+        stock: { type: integer, description: Current inventory level }
+        rating: { type: number }
+        createdBy: { oneOf: [ { type: string }, { $ref: '#/components/schemas/User' } ] } # Can be populated or just ID
+        createdAt: { type: string, format: date-time }
+
+    Order:
+      type: object
+      properties:
+        _id: { type: string }
+        userId: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              bookId: { type: string }
+              quantity: { type: integer }
+              priceAtPurchase: { type: number, description: Frozen price at the time of sale }
+        totalAmount: { type: number }
+        status: { type: string, enum: [pending, completed, shipped, cancelled] }
+        createdAt: { type: string, format: date-time }

@@ -1,5 +1,7 @@
 
 import User from "../models/user_model.js"
+import bcrypt from "bcrypt"
+import jwt from "jsonwebtoken"
 
 export async function SignUpUser(req,res){
   try{
