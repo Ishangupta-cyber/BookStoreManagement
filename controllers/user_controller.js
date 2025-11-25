@@ -1,4 +1,4 @@
-import Book from "../models/book_model.js"
+
 import User from "../models/user_model.js"
 
 export async function SignUpUser(req,res){
