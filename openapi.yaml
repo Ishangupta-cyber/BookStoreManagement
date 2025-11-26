@@ -105,6 +105,10 @@ paths:
                   success: { type: boolean, example: true }
                   total: { type: integer, example: 50 }
                   data: { type: array, items: { $ref: '#/components/schemas/Book' } }
+  
+    
+    
+
 
   /book/create:
     post:
@@ -164,6 +168,24 @@ paths:
           description: Book deleted successfully
         '403':
           description: Forbidden (user is not owner and not admin)
+    get:
+      tags: [Books]
+      summary: Get a single book by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Book ID
+      responses:
+        '200':
+          description: Book found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookResponse'
+        '404':
+          description: Book not found
 
   /order/place:
     post:
@@ -225,6 +247,63 @@ paths:
           description: Forbidden (user is not Admin)
         '404':
           description: User not found
+  /author/users:
+    get:
+      tags: [Admin]
+      summary: Get all users (Admin only)
+      security: [ { cookieAuth: [] } ]
+      responses:
+        '200':
+          description: List of all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+        '403':
+          description: Forbidden (not Admin)
+
+  /author/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get a specific user by ID
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: User ID
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+
+    delete:
+      tags: [Admin]
+      summary: Delete a user account
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: User ID
+      responses:
+        '200':
+          description: User deleted successfully
+        '404':
+          description: User not found
+
 
 components:
   securitySchemes:
