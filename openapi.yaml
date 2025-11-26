@@ -270,7 +270,7 @@ paths:
   /author/users/{id}:
     get:
       tags: [Admin]
-      summary: Get a specific user by ID
+      summary: Get a specific user by ID (Admin only)
       security: [ { cookieAuth: [] } ]
       parameters:
         - in: path
@@ -290,7 +290,7 @@ paths:
 
     delete:
       tags: [Admin]
-      summary: Delete a user account
+      summary: Delete a user account (Admin only)
       security: [ { cookieAuth: [] } ]
       parameters:
         - in: path
